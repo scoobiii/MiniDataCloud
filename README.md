@@ -1,44 +1,70 @@
-# MiniDataCloud
+# MiniDataCloud - **Projeto Insight Energy**
 
-### **Projeto Insight Energy: MiniDataCloud**
+## **Versão do Projeto: v2.1.0**
 
----
-
-Este documento consolida e versão o projeto **Insight Energy**, integrando funcionalidades de monitoramento, controle de infraestrutura e cloud computing para o ambiente MiniDataCloud no hardware **Satellite L505**.
+Este documento descreve a atualização e versão do projeto **MiniDataCloud**, integrando ferramentas para escalabilidade, monitoramento e controle de energia em uma infraestrutura híbrida de cloud computing e servidores bare-metal.
 
 ---
 
-### **1. Nova Arquitetura do Projeto**
+### **1. Arquitetura do Projeto**
 
 #### **Configuração de Hardware: Satellite L505**
-- **Processador:** Intel Core i3 M330 (2.13GHz, 2 núcleos, 4 threads, cache L3 3 MB).  
-- **Capacidade Operacional:** Virtualização **VT-x** habilitada para ambientes Kubernetes.  
-- **Sistema Operacional:** Ubuntu Server, configurado com ferramentas de suporte a cloud e monitoramento:
+- **Processador:** Intel Core i3 M330 (2.13GHz, 2 núcleos, 4 threads, cache L3 3 MB).
+- **Capacidade de Virtualização:** VT-x habilitada para ambientes Kubernetes.
+- **Sistema Operacional:** Ubuntu Server, configurado com suporte a ferramentas de cloud e monitoramento:
   - **Ubuntu Cloud Tools:** Pré-configurado para Kubernetes.
-  - **Netdata:** Para monitoramento em tempo real.
-  - **KVM:** Para gerenciamento de VMs locais.
-  
+  - **Netdata:** Monitoramento em tempo real.
+  - **KVM:** Gerenciamento de VMs locais.
+
 ---
 
-#### **Cluster Kubernetes com Replicação Multi-Nuvem**
-**Objetivo:** Criar uma infraestrutura híbrida com replicação e escalabilidade automática para clouds públicas.  
+### **Fase 1: MAAS Bare-metal com MongoDB Local**
 
-- **Ferramentas Necessárias:**
-  - **MicroK8s:** Cluster Kubernetes bare-metal.
-  - **Velero:** Backup e recuperação de ambientes.
-  - **ArgoCD:** Sincronização contínua entre o cluster local e clouds públicas (Azure, GCP, AWS, Oracle, Alibaba).  
-  - **MetalLB:** Load Balancer para IPs locais em bare-metal.
+#### **MAAS Bare-metal**
+O MAAS é configurado para gerenciar servidores físicos locais. Durante esta fase inicial, o foco é o gerenciamento de servidores bare-metal sem a necessidade de racks ou controladores regionais.
 
-**Configuração Inicial:**
+**Comando para instalação do MAAS**:
+```bash
+sudo apt install maas
+```
+
+#### **MongoDB Local**
+A instalação do MongoDB local permite o gerenciamento de dados em um ambiente controlado. Para esta fase, a replicação de dados pode ser evitada.
+
+**Comando para instalação do MongoDB**:
+```bash
+sudo apt install mongodb
+```
+
+**Configuração do Banco de Dados MongoDB:**
+- Criação de bancos de dados para armazenar logs e monitoramento de dados de consumo energético e desempenho dos servidores.
+
+---
+
+### **Fase 2: MAAS Region + Rack com Kubernetes**
+
+#### **MAAS Region + Rack**
+O MAAS é expandido para configurar um ambiente multi-nuvem, com um controlador de região gerenciando a nuvem pública e o controlador de rack gerenciando os servidores bare-metal locais.
+
+**Comando para instalação MAAS Region + Rack**:
+```bash
+sudo maas init region+rack
+```
+
+#### **Kubernetes em Nuvem e Bare-metal**
+**MicroK8s** é utilizado para configurar o cluster Kubernetes em servidores bare-metal e nuvem pública.
+
+**Comando para instalação do Kubernetes (MicroK8s)**:
 ```bash
 sudo snap install microk8s --classic
 microk8s status --wait-ready
 microk8s enable dns storage metallb
 ```
-Adicione um range de IPs locais ao MetalLB para balanceamento.  
 
-**Replicação Externa:**
-Utilize **Velero**:
+#### **Replicação Multi-Nuvem com Velero**
+**Velero** é utilizado para backup e recuperação da infraestrutura, garantindo a consistência dos dados entre ambientes híbridos.
+
+**Comando para instalação do Velero**:
 ```bash
 velero install --provider gcp --bucket <bucket-name> --secret-file <credentials-file>
 ```
@@ -48,36 +74,27 @@ velero install --provider gcp --bucket <bucket-name> --secret-file <credentials-
 ### **2. Monitoramento Avançado de Infraestrutura**
 
 #### **Monitoramento de Ventoinhas**
-**Diagnóstico:**  
-As ventoinhas são controladas pela CPU via sensores térmicos, configurados com o **lm-sensors**.  
+Instale o **lm-sensors** para monitorar a temperatura da CPU e as ventoinhas.
 
-**Algoritmo de Controle Térmico:**  
-Manter a CPU na faixa entre o ponto de orvalho (20°C) e 40°C, com RPM variável proporcional à temperatura.
+**Comando para instalação do lm-sensors**:
+```bash
+sudo apt install lm-sensors
+sudo sensors-detect
+```
 
-**Código do Algoritmo:**
-Veja [aqui](#algoritmo-controle-termico).
+#### **Netdata: Monitoramento em Tempo Real**
+Utilize **Netdata** para monitorar o uso de CPU, memória, e o consumo de energia, com integração a gráficos de temperaturas e ventoinhas.
 
-#### **Netdata:**  
-1. **Configuração de Sensores:**
-   ```bash
-   sudo apt install lm-sensors
-   sudo sensors-detect
-   ```
-2. **Adicionando Gráficos de RPM e Temperatura:**
-   Configure o Netdata para capturar e exibir os dados das ventoinhas e núcleos.  
+    http://192.168.15.21:19999/=false&chartName-val=menu_system&local--chartName-val=menu_system&local-overview-sidebarTab-val=chartIndexing&sidebarOpen-bool=true&sidebarTab-val=filters&integrationsModalOpen=&selectedIntegration=deploy-docker&selectedIntegrationTab=&local-overview-tocSearch-val=temperature&tocSearch-val=temperature&threshold=0.01&local-nodesView-nodeIdToGo-val=menu_Live&nodeIdToGo-val=menu_Live&local-nodesView-sidebarTab-val=chartIndexing&local-nodesView-sidebarNodeId-val=d954d2a8-aac9-11ef-a914-70f1a13895fe&sidebarNodeId-val=d954d2a8-aac9-11ef-a914-70f1a13895fe&local--sidebarOpen-bool=true
 
 ---
 
-#### **Monitoramento Climático Externo**
-1. **Localização do Servidor:**
-   Obtenha a localização geográfica por IP usando:
-   ```bash
-   curl http://ipinfo.io
-   ```
-2. **Dados Climáticos Externos:**  
-   Integre a API do **OpenWeatherMap** para coletar dados de temperatura, umidade e pressão da estação mais próxima.
+### **3. Monitoramento Climático Externo e Controle Térmico**
 
-**Exemplo de Integração:**
+#### **Integração com API do OpenWeatherMap**
+Recupere dados de temperatura e umidade externos para otimizar o controle térmico interno dos servidores.
+
+**Exemplo de código para integrar OpenWeatherMap**:
 ```python
 import requests
 API_KEY = "sua_api_key"
@@ -91,21 +108,27 @@ def get_weather():
 
 ---
 
-### **3. Monitoramento Energético e Treemaps**
+### **4. Estimativa de Consumo Energético**
 
-#### **Algoritmo de Estimativa de Consumo:**
-O consumo energético será calculado em tempo real com base em:
-- **Utilização da CPU:** Dados do Intel RAPL.  
-- **Consumo de RAM e Disco:** Fórmula aproximada:
-  ```plaintext
-  Consumo (Watts) ≈ [(CPU Util % x TDP) + (RAM Util x 0.3) + (Disco I/O x 0.2)]
-  ```
+Utilize a seguinte fórmula para calcular o consumo de energia baseado em dados de CPU, RAM e I/O de disco:
 
-#### **Treemaps Dinâmicos:**
-- Crie hierarquias de consumo (por servidor, núcleo, aplicação) usando **D3.js** ou **Plotly**.
-- Configure o Netdata para exportar dados para **Grafana** com **InfluxDB** como backend.
+```plaintext
+Consumo (Watts) ≈ [(CPU Util % x TDP) + (RAM Util x 0.3) + (Disco I/O x 0.2)]
+```
 
-**Exemplo de Exportação do Netdata:**
+#### **Cálculo de Custos Energéticos:**
+```plaintext
+Custo (R$/h) = Consumo Total (kWh) x Tarifa (R$/kWh)
+```
+
+---
+
+### **5. Treemaps Dinâmicos para Visualização de Consumo Energético**
+
+- Use **D3.js** ou **Plotly** para criar treemaps dinâmicos visualizando consumo de energia por servidor, núcleo e aplicação.
+- Exporte dados do **Netdata** para **Grafana** e armazene-os no **InfluxDB**.
+
+**Comando para exportação do Netdata para InfluxDB**:
 ```bash
 sudo apt install influxdb
 netdata export influxdb
@@ -113,39 +136,22 @@ netdata export influxdb
 
 ---
 
-### **4. Monitoramento da Fonte de Energia**
-**Fonte de Alimentação:** IT Blue LEW 2562 (19V, 4.5-5A).  
-Integre sensores externos para monitoramento de voltagem e corrente, com exportação de dados para o Netdata.  
+### **6. Monitoramento de Segurança e Backup**
 
-**Cálculo de Custos Energéticos:**  
-```plaintext
-Custo (R$/h) = Consumo Total (kWh) x Tarifa (R$/kWh)
+#### **Backup com Velero**
+Utilize **Velero** para garantir backups automáticos, com criptografia de dados para maior segurança.
+
+**Comando para instalação do Velero**:
+```bash
+velero install --provider gcp --bucket <bucket-name> --secret-file <credentials-file>
 ```
 
----
-
-### **5. Algoritmos e Códigos**
-
-#### **Algoritmo Controle Térmico**
-```python
-# Algoritmo já fornecido acima.
-```
+#### **Monitoramento de Segurança**
+Implemente políticas de segurança baseadas no **CIS Kubernetes Benchmark**.
 
 ---
 
-### **6. Integração Multi-Nuvem com Segurança**
+### **7. Versão Atual do Projeto: v2.1.0**
 
-**Backup e Recuperação com Velero:**  
-Garanta que todos os dados de replicação estejam seguros utilizando backups automáticos com criptografia.  
-
-**Monitoramento de Segurança:**  
-Implemente políticas de segurança baseadas no CIS Kubernetes Benchmark.  
-
----
-
-### **7. Versão Atual do Projeto**
-
-- **Versão:** `v2.1.0`  
-- **Componentes Integrados:** Kubernetes, Netdata, Velero, Monitoramento Térmico, Cloud Pública.
-
-Este projeto entrega um **MiniDataCloud** eficiente e modular, com foco em monitoramento, segurança e replicação distribuída.
+- **Componentes Integrados:** Kubernetes, MAAS, Velero, Netdata, Monitoramento Térmico, Cloud Pública.
+- **Objetivos:** Gerenciamento de infraestrutura híbrida com escalabilidade, alta disponibilidade e monitoramento energético.
